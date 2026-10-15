@@ -49,10 +49,11 @@ st.markdown("---")
 # -------------------------------------------------------------
 # Tabs Navigation
 # -------------------------------------------------------------
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📈 Demand Forecasting", 
     "👥 Customer Segmentation (RFM)", 
-    "⚠️ Churn Risk Predictor"
+    "⚠️ Churn Risk Predictor",
+    "📦 Inventory Optimization"
 ])
 
 # -------------------------------------------------------------
@@ -170,3 +171,54 @@ with tab3:
         else:
             st.success(f"✅ Active & Engaged (Probability of Churn: {churn_prob * 100:.1f}%)")
             st.info("Recommended Action: Upsell premium catalog items.")
+
+# -------------------------------------------------------------
+# Tab 4: Inventory Optimization
+# -------------------------------------------------------------
+with tab4:
+    st.subheader("📦 Inventory Optimization & Reorder Suggestions")
+    st.markdown("Analyze current inventory levels and calculate recommended reorder quantities based on daily run rate.")
+
+    inventory_data = pd.DataFrame({
+        "Product": ["Office Desk", "Ergonomic Chair", "Mechanical Keyboard", "Monitor Stand", "Wireless Mouse"],
+        "Current_Stock": [14, 8, 45, 12, 60],
+        "Min_Safety_Stock": [20, 15, 30, 20, 25],
+        "Avg_Daily_Sales": [3.2, 2.5, 4.0, 2.8, 5.1],
+        "Lead_Time_Days": [7, 7, 5, 7, 4]
+    })
+
+    # Reorder Point = (Avg Daily Sales * Lead Time) + Safety Stock
+    inventory_data["Reorder_Point"] = (
+        (inventory_data["Avg_Daily_Sales"] * inventory_data["Lead_Time_Days"]) + inventory_data["Min_Safety_Stock"]
+    ).round().astype(int)
+
+    inventory_data["Status"] = inventory_data.apply(
+        lambda row: "⚠️ Low Stock / Reorder" if row["Current_Stock"] <= row["Reorder_Point"] else "✅ Healthy Stock", 
+        axis=1
+    )
+    
+    inventory_data["Suggested_Reorder_Qty"] = inventory_data.apply(
+        lambda row: max(0, int((row["Reorder_Point"] * 1.5) - row["Current_Stock"])) if row["Current_Stock"] <= row["Reorder_Point"] else 0,
+        axis=1
+    )
+
+    col_m1, col_m2 = st.columns(2)
+    low_stock_count = (inventory_data["Status"] == "⚠️ Low Stock / Reorder").sum()
+    col_m1.metric("Items Requiring Reorder", low_stock_count, delta=f"{low_stock_count} critical", delta_color="inverse")
+    col_m2.metric("Optimal Stock Items", len(inventory_data) - low_stock_count)
+
+    st.dataframe(
+        inventory_data[["Product", "Current_Stock", "Min_Safety_Stock", "Reorder_Point", "Status", "Suggested_Reorder_Qty"]],
+        use_container_width=True
+    )
+
+    fig_inv = px.bar(
+        inventory_data,
+        x="Product",
+        y=["Current_Stock", "Reorder_Point"],
+        barmode="group",
+        title="Current Stock vs Reorder Point Threshold",
+        labels={"value": "Quantity", "variable": "Stock Type"},
+        template="plotly_white"
+    )
+    st.plotly_chart(fig_inv, use_container_width=True)
